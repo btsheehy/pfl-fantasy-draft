@@ -25,7 +25,7 @@ const Header: React.FC = () => {
 							</li>
 							<li>
 								<Link
-									to="/players"
+									to="/players?available=true"
 									className="hover:text-yellow-300 transition duration-200 font-semibold"
 								>
 									Players
@@ -33,10 +33,10 @@ const Header: React.FC = () => {
 							</li>
 							<li>
 								<Link
-									to="/roster"
+									to={"/roster/" + localStorage.getItem('my_team_id')}
 									className="hover:text-yellow-300 transition duration-200 font-semibold"
 								>
-									My Roster
+									Rosters
 								</Link>
 							</li>
 							<li>

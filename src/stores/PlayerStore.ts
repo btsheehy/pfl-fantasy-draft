@@ -7,13 +7,19 @@ export class PlayerStore {
   isLoading = false;
   error: string | null = null;
   rootStore: RootStore;
+  hasLoaded = false;
 
   constructor(rootStore: RootStore) {
     this.rootStore = rootStore;
-    makeAutoObservable(this);
+    makeAutoObservable(this, {
+      rootStore: false,
+      hasLoaded: false
+    });
   }
 
   async fetchPlayers() {
+    if (this.hasLoaded) return; // Prevent refetching if already loaded
+
     this.isLoading = true;
     this.error = null;
     try {
@@ -21,6 +27,7 @@ export class PlayerStore {
       runInAction(() => {
         this.players = players;
         this.isLoading = false;
+        this.hasLoaded = true;
       });
     } catch (error) {
       runInAction(() => {

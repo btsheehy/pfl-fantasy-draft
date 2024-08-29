@@ -1,38 +1,50 @@
 // src/stores/AuctionStore.ts
 import { makeAutoObservable } from "mobx"
 import { RootStore } from "./RootStore"
+import { AuctionResult, api, ApiPlayer, ApiTeam } from "../services/api"
 
-export interface AuctionResult {
+export interface AuctionPlayer {
+	id: number
+	name: string
+	position: string
+	nflTeam: string
+	projectedPoints: number
+}
+
+interface NewAuctionEvent {
 	playerId: number
-	winningTeamId: number
-	winningBid: number
+	nominatingTeamId: number
+	initialBid: number
 }
 
 export class AuctionStore {
-	currentAuctionPlayerId: number | null = null
+	currentAuction: {
+		player: ApiPlayer | null
+		nominatingTeam: ApiTeam | null
+		initialBid: number
+	} | null = null
 	auctionResults: AuctionResult[] = []
 	rootStore: RootStore
 
 	constructor(rootStore: RootStore) {
 		this.rootStore = rootStore
 		makeAutoObservable(this)
-		this.loadMockAuctionResults()
 	}
 
-	loadMockAuctionResults() {
-		this.auctionResults = [
-			{ playerId: 1, winningTeamId: 1, winningBid: 55 },
-			{ playerId: 2, winningTeamId: 2, winningBid: 65 },
-			{ playerId: 3, winningTeamId: 3, winningBid: 58 },
-		]
+	handleNewAuction(event: NewAuctionEvent, players: ApiPlayer[], teams: ApiTeam[]) {
+		this.currentAuction = {
+			player: players.find(player => player.id === event.playerId) || null,
+			nominatingTeam: teams.find(team => team.id === event.nominatingTeamId) || null,
+			initialBid: event.initialBid
+		}
 	}
 
-	setCurrentAuctionPlayer(playerId: number) {
-		this.currentAuctionPlayerId = playerId
-	}
-
-	addAuctionResult(result: AuctionResult) {
-		this.auctionResults.push(result)
-		this.currentAuctionPlayerId = null
+	async fetchAuctionResults() {
+		try {
+			const results = await api.getAuctionResults()
+			this.auctionResults = results
+		} catch (error) {
+			console.error("Failed to fetch auction results:", error)
+		}
 	}
 }

@@ -8,20 +8,27 @@ export class TeamStore {
 	isLoading = false
 	error: string | null = null
 	rootStore: RootStore
+	hasLoaded = false
 
 	constructor(rootStore: RootStore) {
 		this.rootStore = rootStore
-		makeAutoObservable(this)
+		makeAutoObservable(this, {
+			rootStore: false,
+			hasLoaded: false
+		})
 	}
 
 	async fetchTeams() {
+		if (this.hasLoaded) return; // Prevent refetching if already loaded
+
 		this.isLoading = true
 		this.error = null
 		try {
-			const teams = await api.getTeams()
+			const teams = await (await api.getTeams()).map(t => ({...t, usersTeam: t.id === parseInt(localStorage.getItem("my_team_id")!)}))
 			runInAction(() => {
 				this.teams = teams
 				this.isLoading = false
+				this.hasLoaded = true
 			})
 		} catch (error) {
 			runInAction(() => {
@@ -37,5 +44,25 @@ export class TeamStore {
 	}
 	getMyTeam() {
 		return this.getTeamById(parseInt(localStorage.getItem("my_team_id")!))
+	}
+	getTeams() {
+		return this.teams
+	}
+
+	async fetchTeamById(teamId: number) {
+		try {
+			const updatedTeam = await api.getTeamById(teamId);
+			runInAction(() => {
+				const index = this.teams.findIndex(team => team.id === teamId);
+				if (index !== -1) {
+					this.teams[index] = {
+						...updatedTeam,
+						usersTeam: updatedTeam.id === parseInt(localStorage.getItem("my_team_id")!)
+					};
+				}
+			});
+		} catch (error) {
+			console.error(`Failed to fetch team with id ${teamId}:`, error);
+		}
 	}
 }
