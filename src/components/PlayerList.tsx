@@ -1,88 +1,96 @@
 // components/PlayerList.tsx
-import React, { useCallback, useMemo, useState, useEffect } from "react";
-import { observer } from "mobx-react-lite";
-import { useStore } from "../hooks/useStore";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import debounce from "lodash/debounce";
+import React, { useCallback, useMemo, useState, useEffect } from 'react'
+import { observer } from 'mobx-react-lite'
+import { useStore } from '../hooks/useStore'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import debounce from 'lodash/debounce'
 
 const PlayerList: React.FC = observer(() => {
-  const { playerStore, teamStore } = useStore();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { playerStore, teamStore } = useStore()
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const [localSearchTerm, setLocalSearchTerm] = useState(searchParams.get("search") || "");
-  const positionFilter = searchParams.get("position") || "All";
-  const rookieFilter = searchParams.get("rookies") === "true";
-  const availableOnly = searchParams.get("available") === "true";
+  const [localSearchTerm, setLocalSearchTerm] = useState(
+    searchParams.get('search') || '',
+  )
+  const positionFilter = searchParams.get('position') || 'All'
+  const rookieFilter = searchParams.get('rookies') === 'true'
+  const availableOnly = searchParams.get('available') === 'true'
 
   const debouncedUpdateSearchParam = useCallback(
     debounce((value: string) => {
-      setSearchParams(prev => {
+      setSearchParams((prev) => {
         if (value) {
-          prev.set("search", value);
+          prev.set('search', value)
         } else {
-          prev.delete("search");
+          prev.delete('search')
         }
-        return prev;
-      });
+        return prev
+      })
     }, 300),
-    [setSearchParams]
-  );
+    [setSearchParams],
+  )
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && filteredPlayers.length === 1) {
-      navigate(`/player/${filteredPlayers[0].id}`);
+      navigate(`/player/${filteredPlayers[0].id}`)
     }
-  };
+  }
 
   // Update the search handler
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setLocalSearchTerm(value);
-    debouncedUpdateSearchParam(value);
-  };
+    const value = e.target.value
+    setLocalSearchTerm(value)
+    debouncedUpdateSearchParam(value)
+  }
 
   useEffect(() => {
-    const searchFromUrl = searchParams.get("search") || "";
+    const searchFromUrl = searchParams.get('search') || ''
     if (searchFromUrl !== localSearchTerm) {
-      setLocalSearchTerm(searchFromUrl);
+      setLocalSearchTerm(searchFromUrl)
     }
-  }, [searchParams]);
+  }, [searchParams])
 
   const updateSearchParams = (params: Record<string, string | boolean>) => {
-    setSearchParams(prev => {
+    setSearchParams((prev) => {
       Object.entries(params).forEach(([key, value]) => {
-        if (value === false || value === "") {
-          prev.delete(key);
+        if (value === false || value === '') {
+          prev.delete(key)
         } else {
-          prev.set(key, String(value));
+          prev.set(key, String(value))
         }
-      });
-      return prev;
-    });
-  };
+      })
+      return prev
+    })
+  }
 
   const playersOnRosters = useMemo(() => {
-    return teamStore.teams.flatMap(team => team.players.map(player => player.playerId));
-  }, [teamStore.teams]);
+    return teamStore.teams.flatMap((team) =>
+      team.players.map((player) => player.playerId),
+    )
+  }, [teamStore.teams])
 
-  const filteredPlayers = playerStore.players.filter(
-    (player) =>
-      (player.name.toLowerCase().includes(localSearchTerm.toLowerCase()) ||
-      player.position.toLowerCase().includes(localSearchTerm.toLowerCase())) &&
-      (!availableOnly || !playersOnRosters.includes(player.id)) &&
-      (positionFilter === "All" || player.position === positionFilter) &&
-      (!rookieFilter || player.experience === 0)
-  ).slice(0, 100);
+  const filteredPlayers = playerStore.players
+    .filter(
+      (player) =>
+        (player.name.toLowerCase().includes(localSearchTerm.toLowerCase()) ||
+          player.position
+            .toLowerCase()
+            .includes(localSearchTerm.toLowerCase())) &&
+        (!availableOnly || !playersOnRosters.includes(player.id)) &&
+        (positionFilter === 'All' || player.position === positionFilter) &&
+        (!rookieFilter || player.experience === 0),
+    )
+    .slice(0, 100)
 
-  const positions = ["All", "QB", "RB", "WR", "TE", "K", "DST"];
+  const positions = ['All', 'QB', 'RB', 'WR', 'TE', 'K', 'DST']
 
   if (playerStore.isLoading) {
-    return <div>Loading players...</div>;
+    return <div>Loading players...</div>
   }
 
   if (playerStore.error) {
-    return <div>Error: {playerStore.error}</div>;
+    return <div>Error: {playerStore.error}</div>
   }
 
   return (
@@ -111,14 +119,18 @@ const PlayerList: React.FC = observer(() => {
               className="p-2 rounded text-gray-800"
             >
               {positions.map((pos) => (
-                <option key={pos} value={pos}>{pos === "All" ? "All Positions" : pos}</option>
+                <option key={pos} value={pos}>
+                  {pos === 'All' ? 'All Positions' : pos}
+                </option>
               ))}
             </select>
             <label className="flex items-center space-x-2">
               <input
                 type="checkbox"
                 checked={rookieFilter}
-                onChange={(e) => updateSearchParams({ rookies: e.target.checked })}
+                onChange={(e) =>
+                  updateSearchParams({ rookies: e.target.checked })
+                }
                 className="form-checkbox h-5 w-5 text-blue-600"
               />
               <span>Rookies Only</span>
@@ -127,7 +139,9 @@ const PlayerList: React.FC = observer(() => {
               <input
                 type="checkbox"
                 checked={availableOnly}
-                onChange={(e) => updateSearchParams({ available: e.target.checked })}
+                onChange={(e) =>
+                  updateSearchParams({ available: e.target.checked })
+                }
                 className="form-checkbox h-5 w-5 text-blue-600"
               />
               <span>Available Players Only</span>
@@ -166,8 +180,13 @@ const PlayerList: React.FC = observer(() => {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredPlayers.map((player) => (
-                <tr key={player.id} >
-                  <td className="px-6 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors duration-200" onClick={() => navigate(`/player/${player.id}`)}>{player.name}</td>
+                <tr key={player.id}>
+                  <td
+                    className="px-6 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors duration-200"
+                    onClick={() => navigate(`/player/${player.id}`)}
+                  >
+                    {player.name}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {player.position}
                   </td>
@@ -177,9 +196,7 @@ const PlayerList: React.FC = observer(() => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     {player.lastYrFppg}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {player.bye}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">{player.bye}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {player.nflTeam}
                   </td>
@@ -198,7 +215,7 @@ const PlayerList: React.FC = observer(() => {
         </div>
       </div>
     </div>
-  );
-});
+  )
+})
 
-export default PlayerList;
+export default PlayerList

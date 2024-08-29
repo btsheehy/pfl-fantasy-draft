@@ -1,38 +1,38 @@
 // components/Roster.tsx
-import React from "react";
-import { observer } from "mobx-react-lite";
-import { useStore } from "../hooks/useStore";
-import { useParams, useNavigate } from "react-router-dom";
+import React from 'react'
+import { observer } from 'mobx-react-lite'
+import { useStore } from '../hooks/useStore'
+import { useParams, useNavigate } from 'react-router-dom'
 
-import { ApiTeam } from "../services/api";
+import { ApiTeam } from '../services/api'
 
 const Roster: React.FC = observer(() => {
-  const { teamId } = useParams<{ teamId: string }>();
-  const navigate = useNavigate();
-  const { teamStore } = useStore();
-  const [isLoading, setIsLoading] = React.useState(true);
+  const { teamId } = useParams<{ teamId: string }>()
+  const navigate = useNavigate()
+  const { teamStore } = useStore()
+  const [isLoading, setIsLoading] = React.useState(true)
 
   // TODO: fetch inidividual team
   React.useEffect(() => {
     const fetchTeams = async () => {
       if (teamId) {
-        setIsLoading(true);
-        await teamStore.fetchTeams();
-        setIsLoading(false);
+        setIsLoading(true)
+        await teamStore.fetchTeams()
+        setIsLoading(false)
       }
-    };
+    }
 
-    fetchTeams();
-  }, [teamId, teamStore]);
+    fetchTeams()
+  }, [teamId, teamStore])
 
   if (!teamId) {
-    return <div>Team not found</div>;
+    return <div>Team not found</div>
   }
 
-  const team = teamStore.getTeamById(parseInt(teamId));
-  const teams = teamStore.teams;
+  const team = teamStore.getTeamById(parseInt(teamId))
+  const teams = teamStore.teams
 
-  const renderRosterSection = (title: string, players: ApiTeam["players"]) => (
+  const renderRosterSection = (title: string, players: ApiTeam['players']) => (
     <div className="bg-white rounded-lg shadow-md overflow-hidden mb-8">
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-4 px-6">
         <h3 className="text-xl font-semibold">{title}</h3>
@@ -61,12 +61,27 @@ const Roster: React.FC = observer(() => {
           <tbody className="divide-y divide-gray-200">
             {players
               .sort((a, b) => {
-                const positionOrder = { QB: 1, RB: 2, WR: 3, TE: 4, DST: 5, K: 6 };
-                return positionOrder[a.position as keyof typeof positionOrder] - positionOrder[b.position as keyof typeof positionOrder];
+                const positionOrder = {
+                  QB: 1,
+                  RB: 2,
+                  WR: 3,
+                  TE: 4,
+                  DST: 5,
+                  K: 6,
+                }
+                return (
+                  positionOrder[a.position as keyof typeof positionOrder] -
+                  positionOrder[b.position as keyof typeof positionOrder]
+                )
               })
               .map((player) => (
                 <tr key={player.cbssportsId}>
-                  <td className="px-6 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors duration-200" onClick={() => navigate(`/player/${player.playerId}`)}>{player.name}</td>
+                  <td
+                    className="px-6 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors duration-200"
+                    onClick={() => navigate(`/player/${player.playerId}`)}
+                  >
+                    {player.name}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {player.position}
                   </td>
@@ -85,25 +100,24 @@ const Roster: React.FC = observer(() => {
         </table>
       </div>
     </div>
-  );
+  )
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div>Loading...</div>
   }
 
   if (!team) {
-    return <div>Team not found</div>;
+    return <div>Team not found</div>
   }
 
-  const activeRoster = team.players.filter(
-    (player) => {console.log(player.cbssportsId); return player.status === "active"}
-  );
+  const activeRoster = team.players.filter((player) => {
+    console.log(player.cbssportsId)
+    return player.status === 'active'
+  })
   const practiceSquad = team.players.filter(
-    (player) => player.status === "practice"
-  );
-  const injuredReserve = team.players.filter(
-    (player) => player.status === "IR"
-  );
+    (player) => player.status === 'practice',
+  )
+  const injuredReserve = team.players.filter((player) => player.status === 'IR')
 
   return (
     <div className="space-y-8">
@@ -118,7 +132,7 @@ const Roster: React.FC = observer(() => {
           className="block w-64 bg-white border border-gray-300 rounded-md py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           onChange={(e) => {
             if (e.target.value) {
-              navigate(`/roster/${e.target.value}`);
+              navigate(`/roster/${e.target.value}`)
             }
           }}
           value={teamId}
@@ -127,9 +141,9 @@ const Roster: React.FC = observer(() => {
           {teams
             .slice()
             .sort((a, b) => {
-              if (a.usersTeam) return -1;
-              if (b.usersTeam) return 1;
-              return a.name.localeCompare(b.name);
+              if (a.usersTeam) return -1
+              if (b.usersTeam) return 1
+              return a.name.localeCompare(b.name)
             })
             .map((team) => (
               <option key={team.id} value={team.id}>
@@ -138,11 +152,11 @@ const Roster: React.FC = observer(() => {
             ))}
         </select>
       </div>
-      {renderRosterSection("Active Roster", activeRoster)}
-      {renderRosterSection("Practice Squad", practiceSquad)}
-      {renderRosterSection("Injured Reserve", injuredReserve)}
+      {renderRosterSection('Active Roster', activeRoster)}
+      {renderRosterSection('Practice Squad', practiceSquad)}
+      {renderRosterSection('Injured Reserve', injuredReserve)}
     </div>
-  );
-});
+  )
+})
 
-export default Roster;
+export default Roster
