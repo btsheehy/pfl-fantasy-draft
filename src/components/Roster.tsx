@@ -1,5 +1,5 @@
 // components/Roster.tsx
-import React from 'react'
+import React, { useEffect } from 'react'
 import { observer } from 'mobx-react-lite'
 import { useStore } from '../hooks/useStore'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -9,21 +9,16 @@ import { ApiTeam } from '../services/api'
 const Roster: React.FC = observer(() => {
   const { teamId } = useParams<{ teamId: string }>()
   const navigate = useNavigate()
-  const { teamStore } = useStore()
+  const { teamStore, userStore } = useStore()
   const [isLoading, setIsLoading] = React.useState(true)
 
-  // TODO: fetch inidividual team
-  React.useEffect(() => {
-    const fetchTeams = async () => {
-      if (teamId) {
-        setIsLoading(true)
-        await teamStore.fetchTeams()
-        setIsLoading(false)
-      }
+  useEffect(() => {
+    if (teamId) {
+      setIsLoading(true)
+      teamStore.fetchTeamById(parseInt(teamId))
+      setIsLoading(false)
     }
-
-    fetchTeams()
-  }, [teamId, teamStore])
+  }, [teamId, teamStore.fetchTeamById])
 
   if (!teamId) {
     return <div>Team not found</div>
@@ -56,10 +51,30 @@ const Roster: React.FC = observer(() => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Salary
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Bye
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Projected Points
+              </th>
+              {userStore.godMode && (
+                <>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Starter
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    IR
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    PS
+                  </th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {players
+              .sort((a, b) => b.projectedPpg - a.projectedPpg)
               .sort((a, b) => {
                 const positionOrder = {
                   QB: 1,
@@ -92,8 +107,77 @@ const Roster: React.FC = observer(() => {
                     {player.contract}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    ${player.salary.toLocaleString()}
+                    ${player.salary?.toLocaleString()}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap">{player.bye}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {player.projectedPpg?.toFixed(1)}
+                  </td>
+                  {userStore.godMode && (
+                    <>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={player.starter}
+                          onChange={() => {
+                            // TODO: Implement logic to update starter status
+                            teamStore.updateContract(
+                              parseInt(teamId),
+                              player.cbssportsId,
+                              {
+                                salary: player.salary,
+                                starter: !player.starter,
+                                injured_reserve: player.injuredReserve,
+                                practice_squad: player.practiceSquad,
+                              },
+                            )
+                            console.log(
+                              `Toggled starter status for ${player.name}`,
+                            )
+                          }}
+                          className="form-checkbox h-5 w-5 text-blue-600 transition duration-150 ease-in-out"
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={!!player.injuredReserve}
+                          onChange={() => {
+                            teamStore.updateContract(
+                              parseInt(teamId),
+                              player.cbssportsId,
+                              {
+                                salary: player.salary,
+                                starter: player.starter,
+                                injured_reserve: !player.injuredReserve,
+                                practice_squad: player.practiceSquad,
+                              },
+                            )
+                          }}
+                          className="form-checkbox h-5 w-5 text-blue-600 transition duration-150 ease-in-out"
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={!!player.practiceSquad}
+                          onChange={() => {
+                            teamStore.updateContract(
+                              parseInt(teamId),
+                              player.cbssportsId,
+                              {
+                                salary: player.salary,
+                                starter: player.starter,
+                                injured_reserve: player.injuredReserve,
+                                practice_squad: !player.practiceSquad,
+                              },
+                            )
+                          }}
+                          className="form-checkbox h-5 w-5 text-blue-600 transition duration-150 ease-in-out"
+                        />
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
           </tbody>

@@ -52,8 +52,14 @@ const Player: React.FC = observer(() => {
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value === '' ? '' : Number(e.target.value)
     setUserValue(value)
-    if (player && value !== '') {
-      userStore.setPlayerValue(player.id, value)
+    // if (player && value !== '') {
+    //   userStore.setPlayerValue(player.id, value)
+    // }
+  }
+
+  const handleValueBlur = () => {
+    if (player && !!userValue) {
+      userStore.setPlayerValue(player.id, Number(userValue))
     }
   }
 
@@ -169,11 +175,35 @@ const Player: React.FC = observer(() => {
                 </div>
               </>
             )}
+            {userStore.godMode && (
+              <>
+                <div className="bg-gray-100 p-2 rounded">
+                  <p className="text-xs text-gray-600">Proj. Ranking</p>
+                  <p className="text-sm font-semibold">{player.projRanking}</p>
+                </div>
+                <div className="bg-gray-100 p-2 rounded">
+                  <p className="text-xs text-gray-600">Proj. Tier</p>
+                  <p className="text-sm font-semibold">{player.projTier}</p>
+                </div>
+                <div className="bg-gray-100 p-2 rounded">
+                  <p className="text-xs text-gray-600">Proj. Salary</p>
+                  <p className="text-sm font-semibold">
+                    ${player.minSalary} - ${player.maxSalary}
+                  </p>
+                </div>
+                <div className="bg-gray-100 p-2 rounded">
+                  <p className="text-xs text-gray-600">CBS Sports ID</p>
+                  <p className="text-sm font-semibold">{player.cbssportsId}</p>
+                </div>
+              </>
+            )}
           </div>
-          <div className="mt-4 bg-gray-100 p-3 rounded">
-            <p className="text-sm text-gray-600">Full Outlook</p>
-            <p className="text-base">{player.fullOutlook}</p>
-          </div>
+          {userStore.godMode && (
+            <div className="mt-4 bg-gray-100 p-3 rounded">
+              <p className="text-sm text-gray-600">Full Outlook</p>
+              <p className="text-base">{player.fullOutlook}</p>
+            </div>
+          )}
           <div className="mt-4 bg-gray-100 p-3 rounded">
             <label className="block text-sm font-medium text-gray-700">
               Your Value
@@ -182,6 +212,7 @@ const Player: React.FC = observer(() => {
               type="number"
               value={userValue}
               onChange={handleValueChange}
+              onBlur={handleValueBlur}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
             />
           </div>
@@ -197,6 +228,12 @@ const Player: React.FC = observer(() => {
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
             />
           </div>
+          <button
+            onClick={(e) => e.preventDefault()}
+            className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
+          >
+            Save
+          </button>
         </div>
       </div>
     </div>

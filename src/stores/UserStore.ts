@@ -47,6 +47,22 @@ export class UserStore {
     }
   }
 
+  async fetchUserPlayerNotesForPlayer(playerId: number) {
+    if (!this.teamId) return
+    try {
+      const note = await api.getUserPlayerNotesForPlayer(this.teamId, playerId)
+      runInAction(() => {
+        this.playerNotes.set(playerId, note)
+      })
+    } catch (err) {
+      console.error(
+        'Failed to fetch user player notes for player:',
+        playerId,
+        err,
+      )
+    }
+  }
+
   async updatePlayerNote(playerId: number, update: Partial<PlayerNote>) {
     if (!this.teamId) return
     try {
@@ -55,9 +71,7 @@ export class UserStore {
         playerId,
         update,
       )
-      runInAction(() => {
-        this.playerNotes.set(playerId, updatedNote)
-      })
+      await this.fetchPlayerNotes()
     } catch (error) {
       console.error('Failed to update player note:', error)
     }
@@ -89,7 +103,7 @@ export class UserStore {
 
   get starredPlayersList(): number[] {
     return Array.from(this.playerNotes.values())
-      .filter((note) => note.starred)
+      .filter((note) => note && note.starred)
       .map((note) => note.playerId)
   }
 }

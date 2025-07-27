@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import debounce from 'lodash/debounce'
 
 const PlayerList: React.FC = observer(() => {
-  const { playerStore, teamStore } = useStore()
+  const { playerStore, teamStore, userStore } = useStore()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -14,8 +14,12 @@ const PlayerList: React.FC = observer(() => {
     searchParams.get('search') || '',
   )
   const positionFilter = searchParams.get('position') || 'All'
+  const tierFilter = searchParams.get('tier') || 'All'
   const rookieFilter = searchParams.get('rookies') === 'true'
   const availableOnly = searchParams.get('available') === 'true'
+  const starredOnly = searchParams.get('starred') === 'true'
+
+  const starredPlayers = userStore.starredPlayersList
 
   const debouncedUpdateSearchParam = useCallback(
     debounce((value: string) => {
@@ -78,8 +82,15 @@ const PlayerList: React.FC = observer(() => {
             .toLowerCase()
             .includes(localSearchTerm.toLowerCase())) &&
         (!availableOnly || !playersOnRosters.includes(player.id)) &&
+        (!userStore.godMode ||
+          tierFilter === 'All' ||
+          player.projTier === parseInt(tierFilter) ||
+          (tierFilter === '1' &&
+            player.projTier !== undefined &&
+            player.projTier < 2)) &&
         (positionFilter === 'All' || player.position === positionFilter) &&
-        (!rookieFilter || player.experience === 0),
+        (!rookieFilter || player.experience === 0) &&
+        (!starredOnly || starredPlayers.includes(player.id)),
     )
     .slice(0, 100)
 
@@ -124,17 +135,33 @@ const PlayerList: React.FC = observer(() => {
                 </option>
               ))}
             </select>
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={rookieFilter}
-                onChange={(e) =>
-                  updateSearchParams({ rookies: e.target.checked })
-                }
-                className="form-checkbox h-5 w-5 text-blue-600"
-              />
-              <span>Rookies Only</span>
-            </label>
+            {userStore.godMode && (
+              <>
+                <select
+                  value={tierFilter}
+                  onChange={(e) => updateSearchParams({ tier: e.target.value })}
+                  className="p-2 rounded text-gray-800"
+                >
+                  <option value="">All Tiers</option>
+                  {[...Array(20)].map((_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      Tier {i + 1}
+                    </option>
+                  ))}
+                </select>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={rookieFilter}
+                    onChange={(e) =>
+                      updateSearchParams({ rookies: e.target.checked })
+                    }
+                    className="form-checkbox h-5 w-5 text-blue-600"
+                  />
+                  <span>Rookies Only</span>
+                </label>
+              </>
+            )}
             <label className="flex items-center space-x-2">
               <input
                 type="checkbox"
@@ -145,6 +172,17 @@ const PlayerList: React.FC = observer(() => {
                 className="form-checkbox h-5 w-5 text-blue-600"
               />
               <span>Available Players Only</span>
+            </label>
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={starredOnly}
+                onChange={(e) =>
+                  updateSearchParams({ starred: e.target.checked })
+                }
+                className="form-checkbox h-5 w-5 text-blue-600"
+              />
+              <span>Starred Players Only</span>
             </label>
           </div>
         </div>
@@ -158,6 +196,11 @@ const PlayerList: React.FC = observer(() => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Position
                 </th>
+                {userStore.godMode && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Tier
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Projected Points
                 </th>
@@ -173,9 +216,6 @@ const PlayerList: React.FC = observer(() => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Experience
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -190,6 +230,11 @@ const PlayerList: React.FC = observer(() => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     {player.position}
                   </td>
+                  {userStore.godMode && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {player.projTier}
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     {player.projectedFantasyPoints}
                   </td>
@@ -202,11 +247,6 @@ const PlayerList: React.FC = observer(() => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {player.experience || 'Rookie'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button className="bg-yellow-400 text-blue-800 rounded py-1 px-3 text-sm font-semibold hover:bg-yellow-500 transition duration-200">
-                      Add to Watchlist
-                    </button>
                   </td>
                 </tr>
               ))}

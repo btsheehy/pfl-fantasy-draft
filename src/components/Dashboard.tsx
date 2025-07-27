@@ -3,22 +3,37 @@ import React, { useEffect } from 'react'
 import { observer } from 'mobx-react-lite'
 import { useStore } from '../hooks/useStore'
 import { Link } from 'react-router-dom'
+import { ApiPlayer } from '../services/api'
 
 const Dashboard: React.FC = observer(() => {
   const { playerStore, teamStore } = useStore()
 
-  useEffect(() => {
-    playerStore.fetchPlayers()
-  }, [playerStore])
-  useEffect(() => {
-    teamStore.fetchTeams()
-  }, [teamStore])
+  // useEffect(() => {
+  //   playerStore.fetchPlayers()
+  // }, [playerStore])
+  // useEffect(() => {
+  //   teamStore.fetchTeams()
+  // }, [teamStore])
 
   const myTeam = teamStore.getMyTeam()
   const allTeams = teamStore.getTeams()
   const otherTeams = allTeams.filter((team) => team.id !== myTeam?.id)
 
-  const topPlayersByPosition = playerStore.getTopPlayersForEachPosition()
+  const rosteredPlayerIds = teamStore.getLeagueRosteredPlayerIds()
+  const availablePlayers = playerStore.players
+    .filter((player) => !rosteredPlayerIds.includes(player.id))
+    .sort((a, b) => b.projectedFantasyPoints - a.projectedFantasyPoints)
+  const positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DST']
+  const topAvailablePlayersByPosition: [string, ApiPlayer[]][] = positions.map(
+    (position) => {
+      return [
+        position,
+        availablePlayers
+          .filter((player) => player.position === position)
+          .slice(0, 5),
+      ]
+    },
+  )
 
   return (
     <div className="space-y-8">
@@ -43,26 +58,27 @@ const Dashboard: React.FC = observer(() => {
               <p className="text-lg mb-2">
                 Remaining Cap: ${myTeam.availableCap}
               </p>
-              <p className="text-lg">
+              <p className="text-lg mb-2">
                 Cap to spend on one player: ${myTeam.capToSpendOnOnePlayer}
               </p>
+              <p className="text-lg">Players: {myTeam.players.length}</p>
             </div>
           )}
         </div>
 
-        {topPlayersByPosition.map((pos) => (
+        {topAvailablePlayersByPosition.map(([position, players]) => (
           <div
-            key={pos.position}
+            key={position}
             className="bg-white rounded-lg shadow-md overflow-hidden"
           >
             <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-4 px-6">
               <h3 className="text-xl font-semibold">
-                Top Available {pos.position}s
+                Top Available {position}s
               </h3>
             </div>
             <div className="p-6">
               <ul className="space-y-2">
-                {pos.players.map((player) => (
+                {players.map((player) => (
                   <li
                     key={player.id}
                     className="flex justify-between items-center"
@@ -102,9 +118,10 @@ const Dashboard: React.FC = observer(() => {
                 <p className="text-sm mb-1">
                   Remaining Cap: ${team.availableCap}
                 </p>
-                <p className="text-sm">
+                <p className="text-sm mb-1">
                   Cap to spend on one player: ${team.capToSpendOnOnePlayer}
                 </p>
+                <p className="text-sm">Players: {team.players.length}</p>
               </div>
             </div>
           ))}

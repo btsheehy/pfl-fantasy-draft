@@ -1,10 +1,49 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { observer } from 'mobx-react-lite'
 import { useStore } from '../hooks/useStore'
 import { getPlayerImageUrl } from '../utils'
+import { useNavigate } from 'react-router-dom'
 
 const AuctionRoom: React.FC = observer(() => {
-  const { auctionStore, playerStore, teamStore } = useStore()
+  const { auctionStore, playerStore, teamStore, userStore } = useStore()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    auctionStore.fetchAuctionResults()
+  }, [auctionStore])
+
+  const currentAuction = auctionStore.getCurrentAuction()
+
+  useEffect(() => {
+    if (currentAuction?.playerId) {
+      userStore.fetchUserPlayerNotesForPlayer(currentAuction.playerId)
+    }
+  }, [currentAuction?.playerId])
+
+  const userNotesOnCurrentAuctionPlayer = currentAuction?.playerId
+    ? userStore.playerNotes.get(currentAuction?.playerId)
+    : null
+
+  const hydratedCurrentAuction = currentAuction
+    ? {
+        ...currentAuction,
+        player: playerStore.players.find(
+          (p) => p.id === currentAuction?.playerId,
+        ),
+      }
+    : null
+
+  const hydratedRecentAuctionResults = auctionStore
+    .getRecentAuctionResults()
+    .map((result) => {
+      return {
+        ...result,
+        player: playerStore.players.find((p) => p.id === result?.playerId),
+        winningTeam: teamStore.teams.find(
+          (t) => t.id === result?.winningTeamId,
+        ),
+      }
+    })
 
   return (
     <div className="space-y-8">
@@ -20,36 +59,63 @@ const AuctionRoom: React.FC = observer(() => {
           <h3 className="text-xl font-semibold">Current Auction</h3>
         </div>
         <div className="p-6 flex">
-          {auctionStore.currentAuction ? (
+          {hydratedCurrentAuction ? (
             <>
               <div className="w-1/3 pr-4">
                 <img
                   src={getPlayerImageUrl(
-                    auctionStore.currentAuction!.player!.cbssportsId,
+                    hydratedCurrentAuction!.player!.cbssportsId,
                   )}
-                  alt={auctionStore.currentAuction.player!.name}
-                  className="w-full h-auto rounded-full object-cover aspect-square"
+                  style={{
+                    width: '213px',
+                    height: '213px',
+                  }}
+                  alt={hydratedCurrentAuction.player!.name}
+                  className="rounded-full object-cover aspect-square cursor-pointer"
+                  onClick={() => {
+                    navigate(`/player/${hydratedCurrentAuction.player?.id}`)
+                  }}
                 />
               </div>
               <div className="w-2/3 text-left">
-                <p className="text-3xl font-bold mb-2">
-                  {auctionStore.currentAuction.player?.name}
-                </p>
+                <div className="flex items-center mb-2">
+                  <p
+                    className="text-3xl font-bold mr-2 cursor-pointer"
+                    onClick={() => {
+                      navigate(`/player/${hydratedCurrentAuction.player?.id}`)
+                    }}
+                  >
+                    {hydratedCurrentAuction.player?.name}
+                  </p>
+                  {userNotesOnCurrentAuctionPlayer?.starred && (
+                    <span className="text-yellow-400 text-2xl">★</span>
+                  )}
+                </div>
                 <p className="text-xl mb-2">
-                  {auctionStore.currentAuction.player?.position} -{' '}
-                  {auctionStore.currentAuction.player?.nflTeam}
+                  {hydratedCurrentAuction.player?.position} -{' '}
+                  {hydratedCurrentAuction.player?.nflTeam}
                 </p>
-                <p className="text-lg mb-4">
+                <p className="text-lg mb-2">
                   Projected Points:{' '}
-                  {auctionStore.currentAuction.player?.projectedFantasyPoints}
+                  {hydratedCurrentAuction.player?.projectedFantasyPoints}
                 </p>
-                <p className="text-lg mb-4">
-                  Nominating Team:{' '}
-                  {auctionStore.currentAuction.nominatingTeam?.name}
+                <p className="text-lg mb-2">
+                  Bye Week: {hydratedCurrentAuction.player?.bye}
                 </p>
-                <p className="text-lg mb-4">
-                  Initial Bid: ${auctionStore.currentAuction.initialBid}
-                </p>
+                {userNotesOnCurrentAuctionPlayer && (
+                  <>
+                    <p className="text-lg mb-2">
+                      My Value:{' '}
+                      {userNotesOnCurrentAuctionPlayer.value
+                        ? '$' + userNotesOnCurrentAuctionPlayer.value
+                        : 'Not set'}
+                    </p>
+                    <p className="text-lg mb-2">
+                      My Notes:{' '}
+                      {userNotesOnCurrentAuctionPlayer.notes || 'No notes'}
+                    </p>
+                  </>
+                )}
               </div>
             </>
           ) : (
@@ -83,7 +149,7 @@ const AuctionRoom: React.FC = observer(() => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {auctionStore.auctionResults.map((result) => {
+              {hydratedRecentAuctionResults.map((result) => {
                 const player = playerStore.players.find(
                   (p) => p.id === result.playerId,
                 )
@@ -93,13 +159,23 @@ const AuctionRoom: React.FC = observer(() => {
                 if (!player) return null
                 return (
                   <tr key={player.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td
+                      className="px-6 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors duration-200"
+                      onClick={() => {
+                        navigate(`/player/${player.id}`)
+                      }}
+                    >
                       {player.name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {player.position}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td
+                      className="px-6 py-4 whitespace-nowrap px-6 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors duration-200"
+                      onClick={() => {
+                        navigate(`/roster/${team?.id}`)
+                      }}
+                    >
                       {team?.name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

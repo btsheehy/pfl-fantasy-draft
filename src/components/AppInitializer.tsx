@@ -6,6 +6,11 @@ interface AppInitializerProps {
   children: React.ReactNode
 }
 
+interface Refresh {
+  type: 'team' | 'player' | 'auction' | 'playerMetadata' | 'all'
+  id: string | number | null | undefined
+}
+
 const AppInitializer: React.FC<AppInitializerProps> = observer(
   ({ children }) => {
     const { playerStore, teamStore, webSocketStore, auctionStore } = useStore()
@@ -24,18 +29,42 @@ const AppInitializer: React.FC<AppInitializerProps> = observer(
     useEffect(() => {
       if (webSocketStore.socket) {
         webSocketStore.socket.onmessage = (event) => {
-          const data = JSON.parse(event.data)
-          if (data.type === 'newAuction') {
-            auctionStore.handleNewAuction(
-              data.auction,
-              playerStore.players,
-              teamStore.teams,
-            )
+          const eventData = JSON.parse(event.data)
+          console.log('received websocket data')
+          console.log(eventData)
+          if (eventData.type === 'refresh') {
+            const refresh = eventData.data as Refresh
+            if (refresh.type === 'team') {
+              if (refresh.id) {
+                console.log('refreshing team', refresh.id)
+                teamStore.fetchTeamById(refresh.id as number)
+              } else {
+                console.log('refreshing all teams')
+                teamStore.fetchTeams()
+              }
+            }
+            if (refresh.type === 'auction') {
+              console.log('refreshing auction results')
+              auctionStore.fetchAuctionResults()
+            }
+            if (refresh.type === 'all') {
+              console.log('refreshing all')
+              // playerStore.fetchPlayers()
+              teamStore.fetchTeams()
+              auctionStore.fetchAuctionResults()
+            }
           }
-          if (data.type === 'auctionResult') {
-            auctionStore.fetchAuctionResults()
-            teamStore.fetchTeamById(data.auction.winningTeamId)
-          }
+          // if (data.type === 'newAuction') {
+          //   auctionStore.handleNewAuction(
+          //     data.auction,
+          //     playerStore.players,
+          //     teamStore.teams,
+          //   )
+          // }
+          // if (data.type === 'auctionResult') {
+          //   auctionStore.fetchAuctionResults()
+          //   teamStore.fetchTeamById(data.auction.winningTeamId)
+          // }
         }
       }
     }, [webSocketStore.socket, auctionStore, playerStore, teamStore])

@@ -1,7 +1,7 @@
 // src/stores/TeamStore.ts
 import { makeAutoObservable, runInAction } from 'mobx'
 import { RootStore } from './RootStore'
-import { api, ApiTeam } from '../services/api'
+import { api, ApiTeam, ApiContract } from '../services/api'
 
 export class TeamStore {
   teams: ApiTeam[] = []
@@ -19,8 +19,8 @@ export class TeamStore {
   }
 
   async fetchTeams() {
-    if (this.hasLoaded) return // Prevent refetching if already loaded
-
+    // if (this.hasLoaded) return // Prevent refetching if already loaded
+    if (this.isLoading) return
     this.isLoading = true
     this.error = null
     try {
@@ -52,11 +52,17 @@ export class TeamStore {
     return this.teams
   }
 
+  getLeagueRosteredPlayerIds() {
+    return this.teams.flatMap((team) =>
+      team.players.map((player) => player.playerId),
+    )
+  }
+
   async fetchTeamById(teamId: number) {
     try {
       const updatedTeam = await api.getTeamById(teamId)
       runInAction(() => {
-        const index = this.teams.findIndex((team) => team.id === teamId)
+        const index = this.teams.findIndex((team) => team.id == teamId)
         if (index !== -1) {
           this.teams[index] = {
             ...updatedTeam,
@@ -67,6 +73,23 @@ export class TeamStore {
       })
     } catch (error) {
       console.error(`Failed to fetch team with id ${teamId}:`, error)
+    }
+  }
+
+  async updateContract(
+    teamId: number,
+    cbssportsId: number,
+    update: {
+      salary: number
+      starter: boolean
+      injured_reserve: boolean
+      practice_squad: boolean
+    },
+  ) {
+    try {
+      const resp = await api.updateContract(teamId, cbssportsId, update)
+    } catch (error) {
+      console.error(`Failed to update contract with id ${cbssportsId}:`, error)
     }
   }
 }
