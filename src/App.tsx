@@ -14,6 +14,8 @@ import AppInitializer from './components/AppInitializer'
 import { LoggedInGate } from './components/SecurityComponents'
 import Login from './components/Login'
 import TradeCenter from './components/TradeCenter'
+import DraftScenarioPage from './components/DraftScenarioPage';
+
 const rootStore = new RootStore()
 
 const App: React.FC = () => {
@@ -33,6 +35,7 @@ const App: React.FC = () => {
                   <Route path="/auction" element={<AuctionRoom />} />
                   <Route path="/command-center" element={<CommandCenter />} />
                   <Route path="/trade-center" element={<TradeCenter />} />
+                  <Route path="/draft-scenario" element={<DraftScenarioPage />} />
                 </Routes>
               </main>
             </div>

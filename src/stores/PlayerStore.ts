@@ -17,6 +17,21 @@ export class PlayerStore {
     })
   }
 
+  enhancePlayer = (player: ApiPlayer) => {
+    return {
+      ...player,
+      teamId: this.rootStore.teamStore.teams.find(t => t.players.some(p => p.playerId === player.id))?.id,
+    }
+  }
+
+  getPlayers() {
+    return this.players.map(this.enhancePlayer)
+  }
+
+  getPlayersByPositionTier(position: string, tier: number) {
+    return this.getPlayers().filter(p => p.position === position && p.projTier === tier).map(this.enhancePlayer)
+  }
+
   async fetchPlayers() {
     if (this.hasLoaded) return // Prevent refetching if already loaded
 
@@ -39,10 +54,13 @@ export class PlayerStore {
   }
 
   getPlayerById(id: number) {
-    return this.players.find((player) => player.id === id)
+    const p = this.players.find((player) => player.id === id)
+    if (!p) return null
+    return this.enhancePlayer(p)
   }
   getTopPlayersForPosition(position: string, count: number = 5) {
     return this.players
+      .map(this.enhancePlayer)
       .filter((player) => player.position === position)
       .sort((a, b) => b.projectedFantasyPoints - a.projectedFantasyPoints)
       .slice(0, count)
@@ -51,7 +69,7 @@ export class PlayerStore {
     const positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DST']
     return positions.map((position) => ({
       position,
-      players: this.getTopPlayersForPosition(position),
+      players: this.getTopPlayersForPosition(position).map(this.enhancePlayer),
     }))
   }
 }

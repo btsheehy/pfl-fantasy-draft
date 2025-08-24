@@ -36,6 +36,11 @@ const Player: React.FC = observer(() => {
     fetchData()
   }, [playerId, playerMetadataStore, userStore])
 
+  const pffData = player?.cbssportsId ? playerMetadataStore.getPlayerPffData(player.cbssportsId) : null
+  const strengthOfScheduleRanking = player?.position && player?.nflTeam 
+    ? playerMetadataStore.getStrengthOfScheduleRanking(player.position as 'QB' | 'RB' | 'WR' | 'TE' | 'DST', player.nflTeam) 
+    : null
+
   const handleStarToggle = () => {
     if (!player) return
     runInAction(() => {
@@ -195,6 +200,62 @@ const Player: React.FC = observer(() => {
                   <p className="text-xs text-gray-600">CBS Sports ID</p>
                   <p className="text-sm font-semibold">{player.cbssportsId}</p>
                 </div>
+                {pffData?.strengthOfSchedule && (
+                  <div className="bg-gray-100 p-2 rounded">
+                    <p className="text-xs text-gray-600">PFF SoS Regular Season</p>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold">{pffData.strengthOfSchedule.regularSeason?.toFixed(2) || 'N/A'}</p>
+                    </div>
+                  </div>
+                )}
+                {pffData?.strengthOfSchedule && (
+                  <div className="bg-gray-100 p-2 rounded">
+                    <p className="text-xs text-gray-600">PFF SoS Playoffs</p>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold">{pffData.strengthOfSchedule.playoffs?.toFixed(2) || 'N/A'}</p>
+                    </div>
+                  </div>
+                )}
+                {pffData?.strengthOfSchedule && strengthOfScheduleRanking && (
+                  <div className="bg-gray-100 p-2 rounded">
+                    <p className="text-xs text-gray-600">PFF SoS All</p>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold">{pffData.strengthOfSchedule.all?.toFixed(2) + ` (${strengthOfScheduleRanking})` || 'N/A'}</p>
+                    </div>
+                  </div>
+                )}
+                {pffData && (
+                  <div className="bg-gray-100 p-2 rounded">
+                    <p className="text-xs text-gray-600">Offense</p>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold">{(pffData?.passing || pffData?.rushing || pffData?.receiving)?.gradesOffense.toFixed(1) || 'N/A'}</p>
+                    </div>
+                  </div>
+                )}
+                {pffData?.passing && (
+                  <div className="bg-gray-100 p-2 rounded">
+                    <p className="text-xs text-gray-600">Passing</p>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold">{pffData.passing?.gradesPass.toFixed(1) || 'N/A'}</p>
+                    </div>
+                  </div>
+                )}
+                {pffData?.rushing && (
+                  <div className="bg-gray-100 p-2 rounded">
+                    <p className="text-xs text-gray-600">Rushing</p>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold">{pffData.rushing?.gradesRun.toFixed(1) || 'N/A'}</p>
+                    </div>
+                  </div>
+                )}
+                {pffData?.receiving && (
+                  <div className="bg-gray-100 p-2 rounded">
+                    <p className="text-xs text-gray-600">Receiving</p>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold">{pffData.receiving?.gradesPassRoute.toFixed(1) || 'N/A'}</p>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>

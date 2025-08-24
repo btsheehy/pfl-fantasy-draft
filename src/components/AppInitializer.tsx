@@ -13,7 +13,7 @@ interface Refresh {
 
 const AppInitializer: React.FC<AppInitializerProps> = observer(
   ({ children }) => {
-    const { playerStore, teamStore, webSocketStore, auctionStore } = useStore()
+    const { playerStore, teamStore, webSocketStore, auctionStore, playerMetadataStore } = useStore()
 
     useEffect(() => {
       if (!playerStore.hasLoaded) {
@@ -22,9 +22,15 @@ const AppInitializer: React.FC<AppInitializerProps> = observer(
       if (!teamStore.hasLoaded) {
         teamStore.fetchTeams()
       }
+      
+      // Fetch strength of schedule rankings if god_mode is enabled
+      const godMode = localStorage.getItem('god_mode') === 'true'
+      if (godMode && !playerMetadataStore.strengthOfScheduleRankingsHasLoaded) {
+        playerMetadataStore.fetchStrengthOfScheduleRankings()
+      }
 
       webSocketStore.connect()
-    }, [playerStore, teamStore, webSocketStore])
+    }, [playerStore, teamStore, webSocketStore, playerMetadataStore])
 
     useEffect(() => {
       if (webSocketStore.socket) {
@@ -67,7 +73,7 @@ const AppInitializer: React.FC<AppInitializerProps> = observer(
           // }
         }
       }
-    }, [webSocketStore.socket, auctionStore, playerStore, teamStore])
+    }, [webSocketStore.socket, auctionStore, playerStore, teamStore, playerMetadataStore])
 
     if (playerStore.isLoading || teamStore.isLoading) {
       return <div>Loading data...</div>

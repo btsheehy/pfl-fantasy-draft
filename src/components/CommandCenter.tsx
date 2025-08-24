@@ -2,9 +2,70 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { observer } from 'mobx-react-lite'
 import { useStore } from '../hooks/useStore'
 import { GodModeGate } from './SecurityComponents'
-import { ApiPlayer } from '../services/api'
+import { ApiPlayer, IdealDraft } from '../services/api'
 import { getPlayerImageUrl } from '../utils'
 import { Link } from 'react-router-dom'
+import { debounce } from 'lodash'
+
+interface DraftOptionsListProps {
+  drafts: IdealDraft[]
+  hydratedCurrentAuction?: any
+}
+
+const DraftOptionsList: React.FC<DraftOptionsListProps> = ({ drafts, hydratedCurrentAuction }) => {
+  const currentPlayerTier = `${hydratedCurrentAuction?.player?.position}|${hydratedCurrentAuction?.player?.projTier}`
+  
+  // Helper function to format tiers with quantities
+  const formatTiersWithQuantities = (positions: any[]) => {
+    // Count occurrences of each tier
+    const tierCounts: { [key: string]: number } = {};
+    positions.forEach(pos => {
+      if (!tierCounts[pos.tier]) {
+        tierCounts[pos.tier] = 0;
+      }
+      tierCounts[pos.tier]++;
+    });
+    
+    // Format tiers with quantities
+    return Object.entries(tierCounts).map(([tier, count]) => {
+      return `${count}${tier}`;
+    }).join(',');
+  };
+
+  return (
+    <div>
+      {drafts.map((draft, index) => (
+        <div key={index} className={`py-3 border-b border-gray-200 last:border-b-0 ${draft.positions.map(p => p.tier).includes(currentPlayerTier) ? 'bg-green-100' : ''}`}>
+          <div className="flex justify-between items-center mb-2">
+            <Link to={`/draft-scenario?tier=${formatTiersWithQuantities(draft.positions)}`}><div className="font-medium">Option {index + 1}</div></Link>
+            <div className="text-sm">
+              <span className="text-blue-600 font-semibold">{draft.points.toFixed(1)}</span> pts |
+              <span className="text-green-600 font-semibold"> ${draft.cost}</span> cost |
+              <span className="text-orange-600 font-semibold"> ${draft.totalCost}</span> total cost
+            </div>
+          </div>
+
+          <div className="grid grid-cols-5 gap-1">
+            {draft.positions.map((position, posIndex) => {
+              const isCurrentPlayerTier = currentPlayerTier === position.tier;
+
+              return (
+                <Link key={posIndex} to={`/players?available=true&position=${position.tier.split('|')[0]}&tier=${position.tier.split('|')[1].split('.')[0]}`}>
+                  <div
+                    className={`bg-gray-100 p-1 rounded text-sm ${
+                      isCurrentPlayerTier ? 'border-2 border-green-500' : ''
+                    }`}
+                  >
+                    <div title={`$${position.cost} | ${position.points.toFixed(1)} ppg`} className="font-medium text-center">{position.tier}</div>
+                </div>
+              </Link>
+            )})}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const CommandCenter: React.FC = observer(() => {
   const {
@@ -16,6 +77,7 @@ const CommandCenter: React.FC = observer(() => {
   } = useStore()
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [searchResults, setSearchResults] = useState<ApiPlayer[]>([])
+  const [fullOutlookExpanded, setFullOutlookExpanded] = useState(false)
   const rosteredPlayerIds = teamStore.getLeagueRosteredPlayerIds()
 
   const currentAuction = auctionStore.getCurrentAuction()
@@ -23,6 +85,18 @@ const CommandCenter: React.FC = observer(() => {
   useEffect(() => {
     auctionStore.fetchAuctionResults()
   }, [auctionStore])
+
+  useEffect(() => {
+    if (currentAuction?.playerId && userStore.godMode) {
+      userStore.fetchIdealDraft()
+      
+      const player = playerMetadataStore.getPlayerMetadata(currentAuction.playerId)
+      if (player) {
+        const tierString = `${player.position}|${player.projTier}`
+        userStore.fetchRemainingDraftOptions(tierString)
+      }
+    }
+  }, [currentAuction?.playerId, playerMetadataStore, userStore, userStore.godMode])
 
   useEffect(() => {
     if (currentAuction?.playerId) {
@@ -38,6 +112,36 @@ const CommandCenter: React.FC = observer(() => {
         player: playerMetadataStore.getPlayerMetadata(currentAuction.playerId),
       }
     : null
+    
+  useEffect(() => {
+    if (hydratedCurrentAuction?.player?.cbssportsId) {
+      playerMetadataStore.fetchPlayerPffData(hydratedCurrentAuction.player.cbssportsId)
+    }
+  }, [hydratedCurrentAuction?.player?.cbssportsId])
+
+  const pffData = playerMetadataStore.getPlayerPffData(hydratedCurrentAuction?.player?.cbssportsId || 0)
+  console.log(pffData)
+
+  useEffect(() => {
+    if (userStore.idealDraftMode === 'starters') {
+      userStore.fetchIdealDraft('starters')
+    } else if (userStore.idealDraftMode === 'backups') {
+      userStore.fetchIdealDraft('backups')
+    }
+  }, [userStore.idealDraftMode])
+
+  useEffect(() => {
+    const currentTier = hydratedCurrentAuction?.player 
+      ? `${hydratedCurrentAuction.player.position}|${hydratedCurrentAuction.player.projTier}`
+      : ''
+    if (currentTier) {
+      if (userStore.remainingDraftMode === 'starters') {
+        userStore.fetchRemainingDraftOptions(currentTier, 'starters')
+      } else if (userStore.remainingDraftMode === 'backups') {
+        userStore.fetchRemainingDraftOptions(currentTier, 'backups')
+      }
+    }
+  }, [hydratedCurrentAuction?.player, userStore.remainingDraftMode])
 
   const availablePlayers = useMemo(
     () =>
@@ -113,6 +217,27 @@ const CommandCenter: React.FC = observer(() => {
     return setWinningBidder(input)
   }
 
+  const debouncedFetchIfDrafting = useRef(
+    debounce((position: string, tier: number, salary: number, mode: 'starters' | 'backups') => {
+      userStore.fetchIfDraftingOptions(position, tier, salary, mode);
+    }, 150)
+  ).current;
+
+  useEffect(() => {
+    if (hydratedCurrentAuction?.player && userStore.godMode) {
+      const position = hydratedCurrentAuction.player.position;
+      const tier = hydratedCurrentAuction.player.projTier!;
+      const salary = bidAmount;
+      
+      debouncedFetchIfDrafting(position, tier, salary, userStore.ifDraftingMode);
+    }
+    
+    // Clean up the debounced function on unmount
+    return () => {
+      debouncedFetchIfDrafting.cancel();
+    };
+  }, [hydratedCurrentAuction?.player, bidAmount, userStore.godMode, userStore.ifDraftingMode, debouncedFetchIfDrafting]);
+
   const handleSubmitAuctionResult = async (
     e?: React.FormEvent<HTMLFormElement>,
   ) => {
@@ -136,8 +261,280 @@ const CommandCenter: React.FC = observer(() => {
   }
 
   const renderPlayerTiers = () => {
-    // TODO: Implement player tiers display
-    return <div>Player Tiers</div>
+    return (
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+        <h3 className="text-xl font-semibold mb-4">Players in Tier</h3>
+        <ul className="space-y-2">
+          {playersInTier.map((player) => {
+            return (
+              <Link to={`/player/${player.id}`} key={player.id}>
+                <li
+                  className={`p-2 rounded ${
+                    player.isAvailable ? 'bg-gray-100' : 'bg-red-100'
+                  }`}
+                >
+                  <span className="font-semibold">{player.name}</span>
+                  <span className="ml-2 text-sm text-gray-600">
+                    {player.projectedFantasyPoints.toFixed(1)} pts
+                  </span>
+                  <span className="ml-2 text-sm text-gray-600">
+                    (SOS: {playerMetadataStore.getStrengthOfScheduleRanking(player.position, player.nflTeam)})
+                  </span>
+                </li>
+              </Link>
+            )
+          })}
+        </ul>
+      </div>
+    )
+  }
+
+  const renderIdealDraft = () => {
+    const activeDrafts = userStore.idealDraftMode === 'starters'
+      ? userStore.idealDraft.starters
+      : userStore.idealDraft.backups
+
+    return (
+      <div className="bg-white rounded-lg shadow-md p-4 relative">
+        <h3 className="text-xl font-semibold mb-4">Ideal Draft</h3>
+
+        {/* Toggle Switch */}
+        <div className="absolute top-4 right-4 flex items-center space-x-2">
+          <button
+            onClick={() => userStore.fetchIdealDraft(userStore.idealDraftMode)}
+            className="text-gray-500 hover:text-blue-500 transition-colors duration-200 mr-3"
+            title="Refresh ideal draft"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
+
+          <div className="flex items-center">
+            <button
+              className={`px-3 py-1 text-sm rounded-l ${
+                userStore.idealDraftMode === 'starters'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 text-gray-700'
+              }`}
+              onClick={() => userStore.setIdealDraftMode('starters')}
+            >
+              Starters
+            </button>
+            <button
+              className={`px-3 py-1 text-sm rounded-r ${
+                userStore.idealDraftMode === 'backups'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 text-gray-700'
+              }`}
+              onClick={() => userStore.setIdealDraftMode('backups')}
+            >
+              Backups
+            </button>
+          </div>
+        </div>
+
+        {userStore.idealDraftLoading ? (
+          <p className="text-gray-500">Loading...</p>
+        ) : activeDrafts.length > 0 ? (
+          <DraftOptionsList drafts={activeDrafts} hydratedCurrentAuction={hydratedCurrentAuction} />
+        ) : (
+          <p className="text-gray-500">No ideal draft data available.</p>
+        )}
+      </div>
+    )
+  }
+
+  const renderRemainingDraftOptions = () => {
+    const activeDrafts = userStore.remainingDraftMode === 'starters'
+      ? userStore.remainingDraftOptions.starters
+      : userStore.remainingDraftOptions.backups
+      
+    const currentTier = hydratedCurrentAuction?.player 
+      ? `${hydratedCurrentAuction.player.position}|${hydratedCurrentAuction.player.projTier}`
+      : ''
+
+    return (
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6 relative">
+        <h3 className="text-xl font-semibold mb-4">If You Pass...</h3>
+
+        {/* Toggle Switch */}
+        <div className="absolute top-4 right-4 flex items-center space-x-2">
+          <button
+            onClick={() => {
+              if (currentTier) {
+                userStore.fetchRemainingDraftOptions(
+                  currentTier, 
+                  userStore.remainingDraftMode
+                )
+              }
+            }}
+            className="text-gray-500 hover:text-blue-500 transition-colors duration-200 mr-3"
+            title="Refresh remaining options"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
+
+          <div className="flex items-center">
+            <button
+              className={`px-3 py-1 text-sm rounded-l ${
+                userStore.remainingDraftMode === 'starters'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 text-gray-700'
+              }`}
+              onClick={() => {
+                userStore.setRemainingDraftMode('starters')
+                if (currentTier) {
+                  userStore.fetchRemainingDraftOptions(currentTier, 'starters')
+                }
+              }}
+            >
+              Starters
+            </button>
+            <button
+              className={`px-3 py-1 text-sm rounded-r ${
+                userStore.remainingDraftMode === 'backups'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 text-gray-700'
+              }`}
+              onClick={() => {
+                userStore.setRemainingDraftMode('backups')
+                if (currentTier) {
+                  userStore.fetchRemainingDraftOptions(currentTier, 'backups')
+                }
+              }}
+            >
+              Backups
+            </button>
+          </div>
+        </div>
+
+        {userStore.remainingOptionsLoading ? (
+          <p className="text-gray-500">Loading...</p>
+        ) : activeDrafts.length > 0 ? (
+          <DraftOptionsList drafts={activeDrafts} hydratedCurrentAuction={hydratedCurrentAuction}/>
+        ) : (
+          <p className="text-gray-500">No remaining draft options available.</p>
+        )}
+      </div>
+    )
+  }
+
+  const renderIfDraftingOptions = () => {
+    const activeDrafts = userStore.ifDraftingMode === 'starters'
+      ? userStore.ifDraftingOptions.starters
+      : userStore.ifDraftingOptions.backups
+    
+    return (
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6 relative">
+        <h3 className="text-xl font-semibold mb-4">If You Draft...</h3>
+
+        {/* Toggle Switch */}
+        <div className="absolute top-4 right-4 flex items-center space-x-2">
+          <button
+            onClick={() => {
+              if (hydratedCurrentAuction?.player && bidAmount) {
+                const position = hydratedCurrentAuction.player.position;
+                const tier = hydratedCurrentAuction.player.projTier!;
+                const salary = bidAmount;
+                
+                userStore.fetchIfDraftingOptions(position, tier, salary, userStore.ifDraftingMode);
+              }
+            }}
+            className="text-gray-500 hover:text-blue-500 transition-colors duration-200 mr-3"
+            title="Refresh if drafting options"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
+
+          <div className="flex items-center">
+            <button
+              className={`px-3 py-1 text-sm rounded-l ${
+                userStore.ifDraftingMode === 'starters'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 text-gray-700'
+              }`}
+              onClick={() => {
+                userStore.setIfDraftingMode('starters');
+                if (hydratedCurrentAuction?.player && bidAmount) {
+                  const position = hydratedCurrentAuction.player.position;
+                  const tier = hydratedCurrentAuction.player.projTier!;
+                  const salary = bidAmount;
+                  
+                  userStore.fetchIfDraftingOptions(position, tier, salary, 'starters');
+                }
+              }}
+            >
+              Starters
+            </button>
+            <button
+              className={`px-3 py-1 text-sm rounded-r ${
+                userStore.ifDraftingMode === 'backups'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 text-gray-700'
+              }`}
+              onClick={() => {
+                userStore.setIfDraftingMode('backups');
+                if (hydratedCurrentAuction?.player && bidAmount) {
+                  const position = hydratedCurrentAuction.player.position;
+                  const tier = hydratedCurrentAuction.player.projTier!;
+                  const salary = bidAmount;
+                  
+                  userStore.fetchIfDraftingOptions(position, tier, salary, 'backups');
+                }
+              }}
+            >
+              Backups
+            </button>
+          </div>
+        </div>
+
+        {userStore.ifDraftingOptionsLoading ? (
+          <p className="text-gray-500">Loading...</p>
+        ) : activeDrafts.length > 0 ? (
+          <DraftOptionsList drafts={activeDrafts} hydratedCurrentAuction={hydratedCurrentAuction} />
+        ) : (
+          <p className="text-gray-500">No draft options available if you draft this player.</p>
+        )}
+      </div>
+    )
   }
 
   const renderPredictedPrices = () => {
@@ -198,28 +595,9 @@ const CommandCenter: React.FC = observer(() => {
       <div className="flex min-h-screen bg-gray-100">
         <div className="w-1/4 py-4 bg-gray-100">
           {hydratedCurrentAuction?.player && (
-            <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-              <h3 className="text-xl font-semibold mb-4">Players in Tier</h3>
-              <p className="mb-2">
-                {hydratedCurrentAuction.player.position} - Tier{' '}
-                {hydratedCurrentAuction.player.projTier}
-              </p>
-              <ul className="space-y-2">
-                {playersInTier.map((player) => (
-                  <Link to={`/player/${player.id}`} key={player.id}>
-                    <li
-                      className={`p-2 rounded ${
-                        player.isAvailable ? 'bg-green-100' : 'bg-gray-100'
-                      }`}
-                    >
-                      <span className="font-semibold">{player.name}</span>
-                      <span className="ml-2 text-sm text-gray-600">
-                        {player.projectedFantasyPoints} pts
-                      </span>
-                    </li>
-                  </Link>
-                ))}
-              </ul>
+            <div>
+              {renderPlayerTiers()}
+              {userStore.godMode && renderIdealDraft()}
             </div>
           )}
           {/* You can add more content or cards here in the left column */}
@@ -262,7 +640,11 @@ const CommandCenter: React.FC = observer(() => {
               </>
             )}
             {hydratedCurrentAuction && hydratedCurrentAuction.player && (
-              <div className="bg-white rounded-lg shadow-lg p-6 relative">
+              <div className={`bg-white rounded-lg shadow-lg p-6 relative ${
+                hydratedCurrentAuction?.player && userStore.isPlayerInIdealDraft(
+                  `${hydratedCurrentAuction.player.position}|${hydratedCurrentAuction.player.projTier}`,
+                ) ? 'border-2 border-green-500' : ''
+              }`}>
                 <button
                   onClick={() =>
                     auctionStore.deleteAuction(hydratedCurrentAuction.id)
@@ -375,13 +757,93 @@ const CommandCenter: React.FC = observer(() => {
                           </p>
                         </div>
                       )}
+                    {hydratedCurrentAuction.player?.cbssportsId && (
+                      <>
+                        <div>
+                          <p className="text-sm text-gray-600">SoS Regular Season</p>
+                          <p className="text-lg font-semibold">
+                            {playerMetadataStore.getPlayerPffData(hydratedCurrentAuction.player.cbssportsId)?.strengthOfSchedule?.regularSeason?.toFixed(2) || 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">SoS Playoffs</p>
+                          <p className="text-lg font-semibold">
+                            {playerMetadataStore.getPlayerPffData(hydratedCurrentAuction.player.cbssportsId)?.strengthOfSchedule?.playoffs?.toFixed(2) || 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">SoS Overall</p>
+                          <p className={`text-lg font-semibold ${
+                            hydratedCurrentAuction.player.position && hydratedCurrentAuction.player.nflTeam && 
+                            playerMetadataStore.getStrengthOfScheduleRanking(
+                              hydratedCurrentAuction.player.position as 'QB' | 'RB' | 'WR' | 'TE' | 'DST', 
+                              hydratedCurrentAuction.player.nflTeam
+                            ) 
+                              ? playerMetadataStore.getStrengthOfScheduleRanking(
+                                  hydratedCurrentAuction.player.position as 'QB' | 'RB' | 'WR' | 'TE' | 'DST', 
+                                  hydratedCurrentAuction.player.nflTeam
+                                ) || 0 <= 12 
+                                  ? 'text-green-500' 
+                                  : playerMetadataStore.getStrengthOfScheduleRanking(
+                                      hydratedCurrentAuction.player.position as 'QB' | 'RB' | 'WR' | 'TE' | 'DST', 
+                                      hydratedCurrentAuction.player.nflTeam
+                                    ) || 0 >= 20 
+                                    ? 'text-red-500' 
+                                    : ''
+                              : ''
+                          }`}>
+                            {playerMetadataStore.getPlayerPffData(hydratedCurrentAuction.player.cbssportsId)?.strengthOfSchedule?.all?.toFixed(2) || 'N/A'}
+                            {hydratedCurrentAuction.player.position && hydratedCurrentAuction.player.nflTeam && 
+                              ` (#${playerMetadataStore.getStrengthOfScheduleRanking(hydratedCurrentAuction.player.position as 'QB' | 'RB' | 'WR' | 'TE' | 'DST', hydratedCurrentAuction.player.nflTeam) || 'N/A'})`
+                            }
+                          </p>
+                        </div>
+                      </>
+                    )}
+                    {pffData && (
+                      <>
+                        <div>
+                          <p className="text-sm text-gray-600">Offense</p>
+                          <p className="text-lg font-semibold">
+                            {(pffData.passing || pffData.rushing || pffData.receiving)?.gradesOffense.toFixed(1)}
+                          </p>
+                        </div> 
+                      {pffData.passing && (
+                        <div>
+                          <p className="text-sm text-gray-600">Passing</p>
+                          <p className="text-lg font-semibold">
+                            {pffData.passing?.gradesPass.toFixed(1)}
+                          </p>
+                        </div>
+                      )}
+                      {pffData.rushing && (
+                        <div>
+                          <p className="text-sm text-gray-600">Rushing</p>
+                          <p className="text-lg font-semibold">
+                            {pffData.rushing?.gradesRun.toFixed(1)}
+                          </p>
+                        </div>
+                      )}
+                      {pffData.receiving && (
+                        <div>
+                          <p className="text-sm text-gray-600">Receiving</p>
+                          <p className="text-lg font-semibold">
+                            {pffData.receiving?.gradesPassRoute.toFixed(1)}
+                          </p>
+                        </div>
+                      )}
+                      </>
+                    )}
                   </div>
                   {hydratedCurrentAuction.player.fullOutlook && (
-                    <div className="mt-6">
-                      <h4 className="text-lg font-semibold mb-2">
+                    <div className="mt-6" onClick={() => setFullOutlookExpanded(!fullOutlookExpanded)}>
+                      <h4 className="text-lg font-semibold mb-2 cursor-pointer">
                         Player Outlook
                       </h4>
-                      <p className="text-gray-700">
+                      <p className={`text-gray-700 relative ${!fullOutlookExpanded ? 'h-24 overflow-y-hidden' : ''}`}>
+                        {!fullOutlookExpanded && (
+                          <span className="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+                        )}
                         {hydratedCurrentAuction.player.fullOutlook}
                       </p>
                     </div>
@@ -389,6 +851,9 @@ const CommandCenter: React.FC = observer(() => {
                 </div>
               </div>
             )}
+            <div className="grid grid-cols-1 lg:grid-cols-1 gap-6 py-4">
+              {userStore.godMode && hydratedCurrentAuction?.player && bidAmount && renderIfDraftingOptions() || null}
+            </div>
           </div>
         </div>
         <div className="w-1/4 py-4 bg-gray-100">
@@ -456,6 +921,9 @@ const CommandCenter: React.FC = observer(() => {
                     No {hydratedCurrentAuction.player.position}s on your roster.
                   </p>
                 )}
+              </div>
+              <div className="grid grid-cols-1 gap-6">
+                  {userStore.godMode && hydratedCurrentAuction?.player && renderRemainingDraftOptions()}
               </div>
             </>
           )}
