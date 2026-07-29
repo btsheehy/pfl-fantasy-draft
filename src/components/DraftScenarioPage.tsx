@@ -63,7 +63,7 @@ const DraftScenarioPage: React.FC = observer(() => {
       <h1 className="text-3xl font-bold mb-6">Draft Scenario</h1>
       {tierInfos.length > 0 ? (
         <div className="space-y-8">
-          {tierInfos.map((tierInfo, index) => {
+          {tierInfos.map((tierInfo) => {
             const tierKey = `${tierInfo.quantity}${tierInfo.position}|${tierInfo.tierNum}`;
             return (
               <div key={tierKey}>

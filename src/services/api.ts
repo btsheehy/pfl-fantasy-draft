@@ -481,7 +481,7 @@ export const api = {
       body: JSON.stringify({
         calculateStarters: fetchStarters,
         calculateBackups: !fetchStarters,
-        capForStarters: 200,
+        capForStarters: 207,
         teamId: teamId,
       }),
     })
@@ -499,7 +499,7 @@ export const api = {
       body: JSON.stringify({
         calculateStarters: fetchStarters,
         calculateBackups: !fetchStarters,
-        capForStarters: 200,
+        capForStarters: 207,
         teamId: teamId,
         skipTier: skipTier
       }),
@@ -524,7 +524,7 @@ export const api = {
       body: JSON.stringify({
         calculateStarters: fetchStarters,
         calculateBackups: !fetchStarters,
-        capForStarters: 200,
+        capForStarters: 207,
         teamId: teamId,
         proposedSalary: {
           position,
